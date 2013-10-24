@@ -1,0 +1,322 @@
+<?php
+
+/**
+  * @file
+  * Seminars module install   
+  *
+  * @author Vadim Pshentsov <pshentsoff@yandex.ru>
+  *   
+  */ 
+  
+require_once('seminars.settings.inc'); 
+
+/**
+ * Implements hook_schema()
+ */ 
+function seminars_schema() {
+  $schema = array();
+  
+  $schema['seminars'] = array(
+    'description' => t('Seminars info'),
+    'fields' => array(
+      'sid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      //TODO: future purposes may be 
+      /**
+      'language' => array(
+        'type' => 'varchar',
+        'length' => 12,
+        ),
+        **/  
+      'created' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'changed' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'status' => array(
+        'description' => t('Seminar status'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'promote' => array(
+        'description' => t('Promote to front page'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'sticky' => array(
+        'description' => t('Sticky at top of lists'),
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+        
+      'title' => array(
+        'description' => t('Seminar title'),
+        'type' => 'varchar',
+        'length' => SEMINARS_SEMINARS_TITLE_LENGTH,
+        'not null' => TRUE,
+        'default' => t('New seminar'),
+        ),
+      'purpose' => array(
+        'description' => t('Seminar purposes info'),
+        'type' => 'text',
+        'size' => 'normal',
+        ),
+      'content' => array(
+        'description' => t('Seminar content'),
+        'type' => 'text',
+        'size' => 'normal',
+        ),
+      'content_format' => array(
+        'description' => t('Content format'),
+        'type' => 'varchar',
+        'length' => SEMINARS_SEMINARS_CONTENT_FORMAT_LENGTH,
+        'default' => SEMINARS_SEMINARS_CONTENT_FORMAT_DEFAULT,
+        ),
+      'diplomas' => array(
+        'desription' => t('Diplomas and awards'),
+        'type' => 'text',
+        'size' => 'normal',
+        ),
+      ),
+    'primary key' => array('sid'),
+    );
+    
+  $schema['seminars_masters'] = array(
+    'description' => t('Table contains short seminar masters persons info.'),
+    'fields' => array(
+      'smid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        ),
+      'fio' => array(
+        'type' => 'varchar',
+        'length' => SEMINARS_SEMINARS_MASTERS_FIO_LENGTH,
+        'not null' => TRUE,
+        'default' => '',
+        ),
+      'degrees' => array(
+        'description' => t('Academic titles, degrees or ranks'),
+        'type' => 'text',
+        'size' => 'normal',
+        ),
+      'photo' => array(
+        'description' => t('Path with filename to uploaded photo file'),
+        'type' => 'varchar',
+        'length' => 256,
+        'not null' => TRUE,
+        'default' => '<none>',
+        ),
+      'photo_fid' => array(
+        'description' => t('Managed file {file_managed}.fid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        ),
+      ),
+    'primary key' => array('smid'),
+    );
+  
+  $schema['seminars_masters_relations'] = array(
+    'description' => 
+      t('RElations between {seminars} and {seminars_masters} tables'),
+    'fields' => array(
+      'sid' => array(
+        'description' => t('Parent seminar {seminars}.sid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'smid' => array(
+        'description' => t('Seminar master {seminars_masters}.smid.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => TRUE,
+        ),
+      ),
+    'primary key' => array('sid', 'smid'),
+    );
+    
+  $schema['seminars_categories'] = array(
+    'description' => t('Table contains seminars categories (directions)'),
+    'fields' => array(
+      'scid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        ),
+      'title' => array(
+        'description' => t('Category title'),
+        'type' => 'varchar',
+        'length' => SEMINARS_SEMINARS_CATEGORIES_TITLE_LENGTH,
+        'not null' => TRUE,
+        'default' => t('New category'),
+        ),
+      'description' => array(
+        'description' => t('Category description'),
+        'type' => 'text',
+        'size' => 'normal',
+        ),
+      ),
+    'primary key' => array('scid'),
+    );
+    
+  $schema['seminars_categories_relations'] = array(
+    'description' =>
+      t('Relations between {seminars} and {seminars_categories} tables.'),
+    'fields' => array(
+      'sid' => array(
+        'description' => t('Parent seminar {seminars}.sid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'scid' => array(
+        'description' => t('Seminar category {seminars_categories}.scid.'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      ),
+    'primary key' => array('sid', 'scid'),
+    );
+    
+  $schema['seminars_periods'] = array(
+    'description' => t('Table contains seminar periods'),
+    'fields' => array(
+      'spid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        ),
+      'sid' => array(
+        'description' => t('Parent seminar {seminars}.sid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        ),
+      'start_date' => array(
+        'description' => t('Seminar start date timestamp'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0, 
+        ),
+      'end_date' => array(
+        'description' => t('Seminar end date timestamp'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0, 
+        ),
+      ),
+    'primary key' => array('spid'),
+    );
+    
+  return $schema;
+}
+
+/**
+ *  Function grants 2 simple permissions to 3 default roles 
+ */ 
+function seminars_grants_permissions() {
+
+  // Get rids for common roles
+  $role = user_role_load_by_name('anonymous user');
+  $anonymous_rid = $role->rid;
+  $role = user_role_load_by_name('authenticated user');
+  $authenticated_rid = $role->rid;
+  $role = user_role_load_by_name('administrator');
+  $administrator_rid = $role->rid;
+
+  //Assign permissions
+  $permissions = array('view seminars');
+  user_role_grant_permissions($anonymous_rid, $permissions);
+  user_role_grant_permissions($authenticated_rid, $permissions);
+  $permissions[] = 'create, edit, delete seminars';
+  user_role_grant_permissions($administrator_rid, $permissions);
+  
+}
+
+/**
+ * Implements hook_install()
+ */ 
+function seminars_install() {
+
+  seminars_grants_permissions();
+}
+
+/**
+ * Implements hook_uninstall()
+ */ 
+function seminars_uninstall() {
+  if(db_table_exists('seminars_categories'))
+    db_drop_table('seminars_categories');
+  if(db_table_exists('seminars_periods'))
+    db_drop_table('seminars_periods');
+  if(db_table_exists('seminars'))
+    db_drop_table('seminars');
+    
+  node_type_delete('seminars');
+}
+
+/**
+ * Field 'diploma' for participants diplomas and awards
+ */ 
+function seminars_update_7000() {
+  $table_name = 'seminars';
+  $field_name = 'diplomas';
+  $field_spec = array(
+    'desription' => t('Diplomas and awards'),
+    'type' => 'text',
+    'size' => 'normal',
+    );
+  if(!db_field_exists($table_name, $field_name)) 
+    db_add_field($table_name, $field_name, $field_spec);
+}
+
+/**
+ * Field 'content_format'
+ */
+function seminars_update_7001() {
+  $table_name = 'seminars';
+  $field_name = 'content_format';
+  $field_spec = array(
+    'description' => t('Content format'),
+    'type' => 'varchar',
+    'length' => SEMINARS_SEMINARS_CONTENT_FORMAT_LENGTH,
+    'default' => SEMINARS_SEMINARS_CONTENT_FORMAT_DEFAULT,
+    );
+  if(!db_field_exists($table_name, $field_name)) 
+    db_add_field($table_name, $field_name, $field_spec);
+} 
+

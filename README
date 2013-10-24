@@ -1,0 +1,144 @@
+Seminars module for Drupal 7.x 
+Module for manage seminars info and shows information to site visitors
+Current version supports: 
+  - multiple periods for one seminars
+  - multiple seminar masters with many-to-many relations
+  - multiple seminar categories(directions) with many-to-many relations
+  - list table and manage seminars embedded at admin/content page
+  - form for create/edit seminar and masters, categories, periods editing   
+    embedded 
+  - template for page out
+
+Versions history:
+version 7.x-0.5.1-dev
+  - category title and description added to seminars list - at preprocessing and
+    common template
+
+version 7.x-0.5.0-dev
+  - changes in main form
+  - Delete/remove seminar periods, categories and masters routines.
+  - BUGFIX: link 'Delete' to delete entire seminar on main form.
+
+version 7.x-0.4.2-dev
+  - URL aliases for seminars and categories
+  - form fields for edit URL aliases
+  - button AJAX request for getting titles in translit (seminars and categories)
+    for URL alias fields
+  - check unique URL aliases before saving 
+
+version 7.x-0.4.1-dev
+  - removed unnecessary placeholders
+
+version 7.x-0.4.0-dev
+  - field 'content_format' added to entity, info about format now saving
+  - use ckeditor at content if available.
+  - full_html format now wide for embed objects
+
+version 7.x-0.3.8-dev
+  - remove from seminars-directions menu categories without seminars and with 
+    unpublished seminars only
+  - now shows in categories seminars without any periods (with open data) 
+  BUGFIX:
+    - fixed: at categories shows not categoried seminars
+
+version 7.x-0.3.7-dev
+  - webform removed from dependencies, but checks added
+  - added callback functionality and operations at 'admin/content'
+  - added batch operations callback - to prevent php timeouts
+  BUGFIX:
+  - fixed: 'Notice: Undefined property ... $roles at ... user.module'
+  
+version 7.x-0.3.6-dev
+  - 'list' is new sub-template view_mode for category list with link to request-  
+    form
+  - module now use webform, relevant string added to dependencies
+  - request-form - new webform for requests to seminars
+  - unpublished seminars not shows to visitors (was for debug reasons)
+  - periods not in date range not showing
+  - over periods not showing
+  - don't show seminars with periods, if all periods was removed from out
+  - include seminars with open data (no periods)
+  - templates lightly changed  
+
+version 7.x-0.3.5-dev
+  - add categories to menu-seminars-direction
+  - seminars/category/N - show seminars that have category with ID eq N, get all 
+    for next 3 month (SEMINARS_PLANS_MONTHS at seminars.settings.inc)
+
+version 7.x-0.3.4-dev
+  - seminars/next/N - shows next N seminars from today
+
+version 7.x-0.3.3-dev
+  - HUF module dependent (functions used wide)
+  - seminars/plans for next 3 (SEMINARS_PLANS_MONTHS at seminars.settings.inc) 
+    months added, as teaser list
+  - some functions at entity
+  - template for teasers
+
+version 7.x-0.3.2-dev
+  BUGFIX:
+    - at seminars template was bug with blocks flow on blocks below if more than 
+      one masters
+
+version 7.x-0.3.1-dev
+  BUGFIX:
+    Warning: file_get_contents() [function.file-get-contents]: Unable to access /sites/all/modules/seminars/seminars.js in _locale_parse_js_file()...
+    Warning: file_get_contents(/sites/all/modules/seminars/seminars.js) [function.file-get-contents]: failed to open stream: Unknown error: 0 in _locale_parse_js_file()
+
+version 7.x-0.3.0-dev
+  UPDATE 7000:
+    - new field 'diplomas' in 'seminars' table
+  - edit/save diplomas data as filtered HTML
+  - templated out diplomas data at seminar page
+
+version 7.x-0.2.2-dev
+  - now possible ajax-load, select and/or edit previous created masters and categories
+  - master's photo now show on form
+  - link to master's photo now receive by ajax too
+  - categories and msters ids send by ajax also
+  BUGFIX:
+    - double savings of edited existing masters and categories 
+  
+version 7.x-0.2.1-dev
+  - page template modified
+  - create/edit form modified
+  - template_preprocess_seminars() modified
+  - menu modified
+  - seminars deletion
+  - some bugs fixed
+
+version 7.x-0.2.0-dev
+  - selects on form changed to textfields, and so simpled saves
+  - 'photo' field removed
+  - 'photo_fid' field added
+  - master's photos uploads by managed file ajax element type
+  - submit form
+  - tables fieldnames corrected due to Drupal conventions and suggestions
+  - listing embedded to admin/content
+  - some bugs fixed
+  - seminars template created
+
+version 7.x-0.1.1-dev
+  - jQuery based append categories and masters is removed
+
+version 7.x-0.1.0-dev
+  - ajax added to form, elements recreated
+  - ajax works good, but difficult to add new categories and masters without 
+    additional forms - in cause of to many ajax and jQuery changes in form that   
+    can't be processed by Drupal :(. Bad branch.
+  
+version 7.x-0.0.2-dev
+  - ajax works bad branch
+  
+version 7.x-0.0.1-dev
+  - tables:
+    - 'seminars'
+    - 'seminars_masters'
+    - 'seminars_categories'
+    - 'seminars_periods'
+  - permissions and default assignments:
+    - 'view seminars'
+    - 'create, edit, delete seminars'
+  - entity
+  - entitycontroller
+  - seminars create/edit/delete form

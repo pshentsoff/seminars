@@ -1,0 +1,570 @@
+<?php
+
+/**
+  * @file
+  * Seminars module  
+  *
+  * @author Vadim Pshentsov <pshentsoff@yandex.ru>
+  *   
+  */
+  
+require_once('seminars.entity.inc');
+require_once('seminars.entitycontroller.inc');
+require_once('seminars.forms.inc');  
+  
+/**
+ * Implements hook_permission()
+ */
+function seminars_permission() {
+  $permissions = array(
+    'view seminars' => array (
+      'title' => t('View seminars'),
+      'description' => t('Permission allow to view seminars.'),
+      ),
+    'create, edit, delete seminars' => array (
+      'title' => t('Create, edit, delete seminars'),
+      'description' => t('Permission allow to do any actions with seminars'),
+      ),
+    );
+    
+  return $permissions;
+} 
+
+/**
+ *  Check access rights
+ *  @return - TRUE if at least one of passed permission present on user,
+ *    FALSE - otherwise  
+ */ 
+function seminars_user_access_any() {
+  $arguments = func_get_args();
+  foreach ($arguments as $permission) {
+    if(!empty($permission) && !is_array($permission)) {
+      if(user_access($permission)) {
+        return TRUE;
+        }
+      }
+    }
+  return FALSE;
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function seminars_admin_paths() {
+  return array(
+    'seminars/*/view' => TRUE,
+    'seminars/*/edit' => TRUE,
+    'seminars/*/delete' => TRUE,
+    'seminars/*/revisions' => TRUE,
+    #'seminars/*/revisions/*/revert' => TRUE,
+    #'seminars/*/revisions/*/delete' => TRUE,
+    'seminars/add' => TRUE,
+    'seminars/add/*' => TRUE,
+    );
+}
+
+/**
+ * Implements hook_menu()
+ */
+function seminars_menu() {
+
+  $items = array();
+  
+  /** Admininster **/
+  $items['node/add/seminars'] = array(
+    'title' => t('Seminar'),
+    'description' => t('Add new seminar'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('seminars_form', NULL, 'create'),
+    'access callback' => 'seminars_user_access_any',
+    'access arguments' => array(
+      'administer nodes',
+      'create, edit, delete seminars',
+      ), 
+    );
+  
+  $items['seminars/%seminars/edit'] = array(
+    'title' => t('Seminar'),
+    'description' => t('Edit seminar'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('seminars_form', 1, 'edit'),
+    'access callback' => 'seminars_user_access_any',
+    'access arguments' => array(
+      'administer nodes',
+      'create, edit, delete seminars',
+      ), 
+    );
+    
+  $items['seminars/%seminars/delete'] = array(
+    'title' => t('Seminar'),
+    'description' => t('Delete seminar'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('seminars_form_delete_confirm', 1),
+    'access callback' => 'seminars_user_access_any',
+    'access arguments' => array(
+      'administer nodes',
+      'create, edit, delete seminars',
+      ), 
+    );
+    
+  /** AJAX **/
+  $items['seminars/ajax/master/data'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'seminars_ajax_master_data',
+    'access arguments' => array('access content'),
+    );
+  
+  $items['seminars/ajax/category/data'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'seminars_ajax_category_data',
+    'access arguments' => array('access content'),
+    );
+  /**
+  $items['seminars/ajax/translit/path'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'seminars_ajax_translit_path',
+    'access arguments' => array('access content'),
+    );
+     **/
+  /** Public **/  
+  $items['seminars/%seminars'] = array(
+    'title callback' => 'seminars_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'seminars_page_view',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+    );
+    
+  $items['seminars/plan'] = array(
+    'title' => t('Events plan'),
+    'page callback' => 'seminars_plan_view',
+    'access arguments' => array('access content'),
+    );
+    
+  $items['seminars/next/%'] = array(
+    'title' => t('Events plan'),
+    'page callback' => 'seminars_next_view',
+    'page arguments' => array(2),
+    'access arguments' => array('access content'),
+    );
+  
+  $items['seminars/request/%seminars'] = array(
+    'title callback' => 'seminars_request_title',
+    'title arguments' => array(3),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('seminars_request_form', 2),
+    'access arguments' => array('access content'),
+    );
+  
+  ############################################
+  # Add categories to menu
+  foreach(seminars_categories_get_titles(FALSE, FALSE) as $scid => $title) {
+    $uri = seminars_category_uri($scid);
+    $items[$uri['path']] = array(
+      'menu_name' => SEMINARS_MENU_SEMINARS_DIRECTIONS, 
+      'title' => strip_tags($title),
+      'page callback' => 'seminars_category_seminars_view',
+      'page arguments' => array(2),
+      'access arguments' => array('access content'),
+      );
+    }
+    
+  return $items;
+}
+
+function seminars_menu_alter(&$items) {
+  $items['admin/content']['page arguments'] = array('seminars_admin_content');
+  $items['admin/content']['file'] = '../../'.drupal_get_path('module', 'seminars').'/seminars.admin.inc';
+}
+
+function seminars_page_title($seminars) {
+  //kpr($seminars);
+  return $seminars->title;
+} 
+
+function seminars_resquest_title($seminars) {
+  return t('Request to seminar @title', array('@title' => $seminars->title));
+}
+
+function seminars_plan_view() {
+  $seminars_plan = array();
+  
+  $seminars_plan['begin_date_str'] = date('d-m-Y');
+  $seminars_plan['begin_date'] = strtotime($seminars_plan['begin_date_str']);
+  $seminars_plan['begin_month_str'] = t(date('F', $seminars_plan['begin_date']));
+
+  $seminars_plan['end_date_str'] = huf_next_months_date(SEMINARS_PLANS_MONTHS);
+  $seminars_plan['end_date'] = strtotime($seminars_plan['end_date_str']);
+  $seminars_plan['end_month_str'] = t(date('F', $seminars_plan['end_date']));
+  
+  $sids = seminars_get_periods_sids(
+    array(
+      'begin_period' => array(
+        'begin' => $seminars_plan['begin_date'],
+        'end' => $seminars_plan['end_date'],
+        ),
+      )
+    );
+  drupal_set_title(
+    t('Events plan from @start_month to @end_month', 
+      array(
+        '@start_month' => $seminars_plan['begin_month_str'],  
+        '@end_month' => $seminars_plan['end_month_str'],
+        )));  
+    
+  if(!count($sids)) {
+    return t('No seminars at next @count months', 
+      array('@count' => (SEMINARS_PLANS_MONTHS + 1)));
+    }
+    
+  $seminars = seminars_load_multiple($sids);
+  
+  foreach($seminars as $key => $seminar) {
+    //Remove not published
+    if(!$seminar->status) {
+      unset($seminars[$key]);
+      continue;
+      }
+    //Clean periods over  
+    foreach($seminar->seminars_periods as $pkey => $period) {
+      if($period->start_date  < $seminars_plan['begin_date']
+        || $period->start_date  > $seminars_plan['end_date']) {
+        unset($seminars[$key]->seminars_periods[$pkey]);
+        }
+      }
+      
+    }
+  
+  //Get seminars without any periods
+  $nop_seminars = seminars_load_multiple();
+  foreach($nop_seminars as $key => $seminar) {
+    if($seminar->status && !count($seminar->seminars_periods)) {
+      $seminars[] = $seminar;
+      }
+    }
+  
+  return seminars_view_multiple($seminars, 'teaser'); 
+}
+
+function seminars_category_seminars_view($scid) {
+
+  $begin_date = strtotime(date('d-m-Y'));
+  $end_date = strtotime(huf_next_months_date(SEMINARS_PLANS_MONTHS));
+  
+  $sids = seminars_get_periods_sids(
+    array(
+      'begin_period' => array(
+        'begin' => $begin_date,
+        'end' => $end_date,
+        ),
+      )
+    );
+    
+  $seminars = seminars_load_multiple($sids);
+  
+  foreach($seminars as $key => $seminar) {
+  
+    //Remove if not published
+    if(!$seminar->status) {
+      unset($seminars[$key]);
+      continue;
+      }
+    
+    //Remove over periods  
+    if(count($seminar->seminars_periods)) {
+      foreach($seminar->seminars_periods as $pkey => $period) {
+        if($period->start_date  < time()) {
+          unset($seminars[$key]->seminars_periods[$pkey]);
+          }
+        }
+      //Remove seminars with all over periods
+      if(!count($seminar->seminars_periods)) {
+        unset($seminars[$key]);
+        continue;
+        }
+      }
+
+    //Check that seminar in given category
+    $found = FALSE;
+    foreach($seminar->seminars_categories as $category) {
+      if($category->scid == $scid) {
+        $found = TRUE;
+        break;
+        }
+      }
+    if(!$found) {
+      unset($seminars[$key]);
+      continue;
+      }
+      
+    //Add showed category id to seminar
+    $seminars[$key]->scid = $scid;
+      
+    }
+     
+  //Get seminars without any periods
+  $nop_seminars = seminars_load_multiple();
+  foreach($nop_seminars as $key => $seminar) {
+    if($seminar->status 
+      && !count($seminar->seminars_periods)
+      && seminars_seminar_category_id($scid, array($seminar))) {
+      $seminar->scid = $scid;
+      $seminars[] = $seminar;
+      }
+    }
+  
+  if(!count($seminars)) {
+    $categories = seminars_categories_get_titles();
+    return t('No seminars for @category at next @count months', 
+      array(
+        '@category' => $categories[$scid],
+        '@count' => (SEMINARS_PLANS_MONTHS + 1)
+        ));
+    }
+  
+  //Build output  
+  $out = array();
+  
+  $category = array_shift(seminars_load_category($scid));
+  $category->type = 'title';
+  $category->sid = 0;
+  array_unshift($seminars, $category);
+  #$out['#category'] = $category;
+  $out += seminars_view_multiple($seminars, 'list');
+  
+  return $out;
+}
+
+function seminars_next_view($count) {
+  
+  $sids = seminars_get_from_date();
+  $seminars = seminars_load_multiple($sids);   
+  
+  foreach($seminars as $key => $seminar) {
+  
+    //Not published - remove
+    if(!$seminar->status) {
+      unset($seminars[$key]);
+      continue;
+      }
+
+    // Perioded seminar
+    if(count($seminar->seminars_periods)) {      
+      foreach($seminar->seminars_periods as $pkey => $period) {
+        // Seminar period is over - remove
+        if($period->start_date  < time()) {
+          unset($seminars[$key]->seminars_periods[$pkey]);
+          }
+        }
+      //No periods at perioded seminar - remove
+      if(!count($seminar->seminars_periods)) {
+        unset($seminar[$key]);
+        continue;
+        }
+      }
+      
+    }
+  
+  $seminars = array_slice($seminars, 0, $count);
+  
+  return seminars_view_multiple($seminars, 'teaser'); 
+}
+
+
+function seminars_page_view($seminars) {
+  
+  if($uri = entity_uri('seminars', $seminars)) {
+    // Set the node path as the canonical URL to prevent duplicate content.
+    drupal_add_html_head_link(
+      array(
+        'rel' => 'canonical', 
+        'href' => url($uri['path'], $uri['options'])
+        ), TRUE);
+    // Set the non-aliased path as a default shortlink.
+    drupal_add_html_head_link(
+      array(
+        'rel' => 'shortlink', 
+        'href' => url($uri['path'], 
+        array_merge($uri['options'], array('alias' => TRUE)))
+        ), TRUE);
+    }
+  return seminars_show($seminars);
+}
+
+function seminars_show($seminars, $message = FALSE) {
+  if ($message) {
+    drupal_set_title(t('Revision of @title from @date', array('@title' => $seminars->title, '@date' => format_date($seminars->changed))), PASS_THROUGH);
+  }
+
+  return seminars_view_multiple(array($seminars->sid => $seminars), 'full');
+}
+
+function seminars_view_multiple($seminars, $view_mode = 'teaser', $weight = 0, $langcode = NULL) {
+  field_attach_prepare_view('seminars', $seminars, $view_mode, $langcode);
+  entity_prepare_view('seminars', $seminars, $langcode);
+  $build = array();
+  foreach ($seminars as $seminar) {
+    $build['seminars'][$seminar->sid] = 
+      seminar_view($seminar, $view_mode, $langcode);
+    $build['seminars'][$seminar->sid]['#weight'] = $weight;
+    $weight++;
+  }
+  $build['seminars']['#sorted'] = TRUE;
+  return $build;
+}
+
+function seminar_view($seminar, $view_mode = 'full', $langcode = NULL) {
+
+  if (!isset($langcode)) {
+    $langcode = $GLOBALS['language_content']->language;
+  }
+
+  // Populate $seminar->content with a render() array.
+  $seminar->seminars_content = huf_issetor($seminar->content);
+  seminar_build_content($seminar, $view_mode, $langcode);
+
+  $build = $seminar->content;
+  // We don't need duplicate rendering info in node->content.
+  unset($seminar->content);
+
+  $build += array(
+    '#theme' => 'seminars', 
+    '#seminars' => $seminar,
+    '#view_mode' => $view_mode,
+    '#language' => $langcode,
+  );
+
+  // Add contextual links for this node, except when the node is already being
+  // displayed on its own page. Modules may alter this behavior (for example,
+  // to restrict contextual links to certain view modes) by implementing
+  // hook_node_view_alter().
+  if (!empty($seminar->sid) && !($view_mode == 'full')) {
+    $build['#contextual_links']['seminar'] = 
+      array('seminar', array($seminar->sid));
+  }
+
+  // Allow modules to modify the structured node.
+  $type = 'seminar';
+  drupal_alter(array('seminar_view', 'entity_view'), $build, $type);
+
+  return $build;
+}
+
+function seminar_build_content($seminar, $view_mode = 'full', $langcode = NULL) {
+  if (!isset($langcode)) {
+    $langcode = $GLOBALS['language_content']->language;
+    }
+
+  // Remove previously built content, if exists.
+  $seminar->content = array();
+
+  // The 'view' hook can be implemented to overwrite the default function
+  // to display nodes.
+  
+  if (seminars_hook($seminar, 'view')) {
+    $seminar = seminar_invoke($seminar, 'view', $view_mode, $langcode);
+    }  
+
+  // Build fields content.
+  // In case of a multiple view, node_view_multiple() already ran the
+  // 'prepare_view' step. An internal flag prevents the operation from running
+  // twice.
+  field_attach_prepare_view('seminars', array($seminar->sid => $seminar), $view_mode, $langcode);
+  entity_prepare_view('seminars', array($seminar->sid => $seminar), $langcode);
+  $seminar->content += field_attach_view('seminars', $seminar, $view_mode, $langcode);
+
+  // Always display a read more link on teasers because we have no way
+  // to know when a teaser view is different than a full view.
+  $links = array();
+  $seminar->content['links'] = array(
+    '#theme' => 'links__node',
+    '#pre_render' => array('drupal_pre_render_links'),
+    '#attributes' => array('class' => array('links', 'inline')),
+    );
+  if ($view_mode != 'full') {
+    $seminar_title_stripped = strip_tags($seminar->title);
+    $links['seminar-readmore'] = array(
+      'title' => t('Read more<span class="element-invisible"> about @title</span>', 
+        array('@title' => $seminar_title_stripped)),
+      'href' => 'seminars/' . $seminar->sid,
+      'html' => TRUE,
+      'attributes' => array('rel' => 'tag', 'title' => $seminar_title_stripped),
+      );
+    }
+  $seminar->content['links']['seminar'] = array(
+    '#theme' => 'links__node__node',
+    '#links' => $links,
+    '#attributes' => array('class' => array('links', 'inline')),
+    );
+  $seminar->links = $links;
+
+  // Allow modules to make their own additions to the node.
+  module_invoke_all('seminars_view', $seminar, $view_mode, $langcode);
+  module_invoke_all('entity_view', $seminar, 'seminars', $view_mode, $langcode);
+}
+
+function seminars_hook($seminar, $hook) {
+  return module_hook('seminars', $hook);
+}
+
+function seminars_theme() {
+  return array(
+    'seminars' => array(
+      'render element' => 'seminars',
+      'variables' => array(
+        'seminars' => NULL,
+        'view_mode' => NULL,
+        ),
+      //'arguments' => array('node' => NULL, 'teaser' => NULL, 'page' => FALSE),
+      'template' => 'seminars',
+      ),
+    ); 
+}
+
+function template_preprocess_seminars(&$variables, $entity_type) {
+
+  $variables['name']      = theme('username', array('account' => $variables['user']));
+
+  if($variables['view_mode'] != 'full') {
+    $variables['theme_hook_suggestions'][] 
+      = $entity_type.'.'.$variables['view_mode'].'.tpl.php';
+    }
+  $variables['page']      = $variables['view_mode'] == 'full';
+  $variables['title_seminar'] = t('Seminar').':';
+  $variables['title_periods'] = t('Periods').':';
+  $variables['title_direction'] = t('Direction').':';
+  $variables['title_master'] = t('Master').':';
+  $variables['title_content'] = t('Content').':';
+  $variables['title_diplomas'] = t('Participants receive').':';
+  $variables['title_request'] = t('Request').':';
+
+  if(!isset($variables['seminars']->type)) {
+    $seminars = $variables['seminars'];
+    
+    $variables['date']      = format_date($seminars->created);
+  
+    $uri = entity_uri('seminars', $seminars);
+    $variables['seminars_url']  = url($uri['path'], $uri['options']);
+    $variables['title']     = check_plain($seminars->title);
+    
+    foreach($seminars->seminars_masters as $key => $master) {
+      if($master->photo_fid) {
+        $variables['seminars']->seminars_masters[$key]->photo_file = 
+          file_create_url(file_load($master->photo_fid)->uri); 
+        } else {
+        $variables['seminars']->seminars_masters[$key]->photo_file = 
+          SEMINARS_SEMINARS_MASTERS_PHOTO_NOPHOTO_FILE;
+        }
+      }
+      
+    foreach($seminars->seminars_periods as $key => $period) {
+      $variables['seminars']->seminars_periods[$key]->start_date_str =
+        date('d ', $period->start_date).t(date('F',$period->start_date))
+        .date(' Y', $period->start_date);
+      $variables['seminars']->seminars_periods[$key]->end_date_str =
+        date('d ', $period->end_date).t(date('F',$period->end_date))
+        .date(' Y', $period->end_date);
+      }
+    }  
+    
+}

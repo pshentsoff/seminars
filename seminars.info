@@ -1,0 +1,8 @@
+name            = Seminars 
+description     = "Module for managing seminars" 
+core            = 7.x
+php             = 5.2
+version         = "7.x-0.5.1-dev"
+files[] = seminars.install 
+files[] = seminars.module 
+dependencies[] = huf
